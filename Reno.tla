@@ -43,7 +43,7 @@ EnableIncreaseWindow == /\ timeout = 0
                               THEN nAck > 0
                               ELSE nAck >= cwnd
                         /\ Finished = FALSE
-                        /\ ticked = 0
+\*                        /\ ticked = 0
                             
 IncreaseWindow == /\ EnableIncreaseWindow
                   /\ IF cwnd < ssthresh
@@ -55,7 +55,7 @@ IncreaseWindow == /\ EnableIncreaseWindow
                   
 EnableDecreaseWindow == /\ timeout = 1
                         /\ Finished = FALSE
-                        /\ ticked = 0
+\*                        /\ ticked = 0
                              
 DecreaseWindow == /\ EnableDecreaseWindow
                   /\ IF cwnd >= 4
@@ -72,7 +72,7 @@ EnableSendNewPacket == /\ timeout = 0
                        /\ arrivals > 0
                        /\ inFlight < cwnd
                        /\ Finished = FALSE
-                       /\ ticked = 0
+\*                       /\ ticked = 0
                     
 SendNewPacket == /\ EnableSendNewPacket
                  /\ arrivals' = arrivals - 1
@@ -94,18 +94,14 @@ EnablePacketArrival == /\ ticked = 1
 PacketArrival == /\ EnablePacketArrival
                  /\ arrivals' = arrivals + getRandomArrival(t, inFlight)
                  /\ time!DoTick
-                 /\ UNCHANGED <<nAck, timeout, cwnd, ssthresh>>
+                 /\ UNCHANGED (pathVars \o <<cwnd, ssthresh>>)
                  
 Next == \/ IncreaseWindow
         \/ DecreaseWindow
         \/ SendNewPacket
         \/ PacketArrival
-        \/ path!DeliverPacket
-        \/ path!DeliverLate
-        \/ path!DeliverAndDropAck
-        \/ path!DropCompletely
-        \/ /\ time!Next
-           /\ UNCHANGED (pathVars \o tcpVars)
+        \/ /\ path!Next
+           /\ UNCHANGED tcpVars
            
 Fairness == /\ path!Fairness
             /\ SF_vars(PacketArrival)
@@ -114,5 +110,5 @@ Spec == Init /\ [][Next]_vars /\ Fairness
                        
 =============================================================================
 \* Modification History
-\* Last modified Wed Nov 02 00:15:28 IRST 2022 by Arvin
+\* Last modified Wed Nov 02 15:39:06 IRST 2022 by Arvin
 \* Created Mon Oct 31 01:51:50 IRST 2022 by Arvin

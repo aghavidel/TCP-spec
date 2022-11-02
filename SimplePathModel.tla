@@ -47,13 +47,38 @@ Init == /\ timeout = 0
         /\ time!Init
         
 Finished == time!Finished
+
+(***************************************************************************)
+(* When the link contains more than 't*C' packets, excessive packets WILL  *)
+(* be dropped immediately, but triggering a timeout and then dropping the  *)
+(* number of packets to 't*C'.                                             *)
+(*                                                                         *)
+(* Certain buffering strategies can be employed here to help, as well as   *)
+(* some token bucket filters, but we will not implement that yet.          *)
+(***************************************************************************)
+                      
+ExcessivePacketDropIsEnabled == /\ inFlight > t * C
+
+(***************************************************************************)
+(* At the end of each timestep, the path model may accept new packets into *)
+(* the link as inflight packets.                                           *)
+(***************************************************************************)
+                      
+PacketInjectionIsEnabled == /\ ticked = 1
+                            /\ Finished = FALSE
+                            
+(***************************************************************************)
+(* Path model is only enabled at the start of each timestep.  Before it    *)
+(* procedes to take actions per packet, it check whether or not excessive  *)
+(* packets are present.  If so, the packets will be dropped.               *)
+(***************************************************************************)
         
 PathModelIsEnabled == /\ inFlight > 0
                       /\ ticked = 0
                       /\ Finished = FALSE
+                      /\ ~ExcessivePacketDropIsEnabled
                       
-PacketInjectionIsEnabled == /\ ticked = 1
-                            /\ Finished = FALSE
+\* Deliver packets and return ACKs
 
 DeliverPacket == /\ PathModelIsEnabled
                  /\ timeout' = 0
@@ -61,11 +86,16 @@ DeliverPacket == /\ PathModelIsEnabled
                  /\ inFlight' = inFlight - 1
                  /\ UNCHANGED timeVars
                  
+\* Deliver and return ACK, but trigger timeout
+                 
 DeliverLate == /\ PathModelIsEnabled 
                /\ timeout' = 1
                /\ nAck' = nAck + 1
                /\ inFlight' = inFlight - 1
                /\ UNCHANGED timeVars
+               
+\* Deliver the packet, but trigger timeout by dropping an ACK. 
+\* Can be disabled completely
               
 DeliverAndDropAck == /\ PathModelIsEnabled
                      /\ DROP_ACK
@@ -74,34 +104,60 @@ DeliverAndDropAck == /\ PathModelIsEnabled
                      /\ inFlight' = inFlight - 1
                      /\ UNCHANGED timeVars
                      
+\* Drop the packet completely and trigger timeout
+                     
 DropCompletely == /\ PathModelIsEnabled
                   /\ timeout' = 1
                   /\ nAck' = nAck
                   /\ inFlight' = inFlight - 1
                   /\ UNCHANGED timeVars
                   
+\* Drop packets exceeding the link capacity
+                  
+DropExcess == /\ ExcessivePacketDropIsEnabled
+              /\ timeout' = 1
+              /\ inFlight' = t * C
+              /\ UNCHANGED <<timeVars, nAck>>
+                  
 Next == \/ DeliverPacket
         \/ DeliverLate
         \/ DeliverAndDropAck
         \/ DropCompletely
-        \/ /\ time!Next
+        \/ DropExcess
+        \/ /\ ~ExcessivePacketDropIsEnabled
+           /\ time!Next
            /\ UNCHANGED pathVars
+           
+\* Packet deliverance must remain strongly fair to prevent useless
+\* scenarios.
            
 Fairness == /\ time!Fairness
             /\ SF_vars(DeliverPacket)
 
 Spec == Init /\ [][Next]_vars /\ Fairness
 
-RateLimited == [] (inFlight <= t * C)
+(***************************************************************************)
+(* Always either:                                                          *)
+(*     1) The link utility is less than or equal to 1                      *)
+(*     2) We are at the start of taking actions per packet, which means    *)
+(*        that if link utility is larger than 1, it will be immediately    *)
+(*        corrected.                                                       *)
+(***************************************************************************)
+
+RateLimited == [] (inFlight <= t * C \/ ticked = 0)
+
+(***************************************************************************)
+(* To test the specification, we create another spec on top of the spec    *)
+(* above.  This specification will allow for packet injections of random   *)
+(* values and if everything goes well, the invariants must remain true.    *)
+(***************************************************************************)
 
 Max(a, b) == IF a > b THEN a ELSE b
 
-Min(a, b) == IF a < b THEN a ELSE b
-
-newPacketsAllowed(timePassed, existingPackets) == Max(timePassed*C - existingPackets - 1, 0)
+newPacketsAllowed(timePassed, existingPackets) == Max(timePassed*MAX_ARRIVAL - existingPackets - 1, 0)
 
 getRandomArrival(timePassed, existingPackets) == 
-    RandomElement(0..Min(MAX_ARRIVAL, newPacketsAllowed(timePassed, existingPackets)))
+    RandomElement(0..newPacketsAllowed(timePassed, existingPackets))
 
 InjectPackets == /\ PacketInjectionIsEnabled
                  /\ inFlight' = inFlight + getRandomArrival(t, inFlight)
@@ -112,15 +168,26 @@ InjectPackets == /\ PacketInjectionIsEnabled
 NextTest == \/ Next
             \/ InjectPackets
             
+(***************************************************************************)
+(* For the same reason that delivering packets must be strongly fair,      *)
+(* having packets to deliver in the first place must also be strongly      *)
+(* fair!                                                                   *)
+(***************************************************************************)
+            
 FairnessTest == /\ time!Fairness
                 /\ SF_vars(DeliverPacket)
                 /\ SF_vars(InjectPackets)
 
 SpecTest == Init /\ [][NextTest]_vars /\ FairnessTest  
 
+(***************************************************************************)
+(* Termination condition just to check we have not overriden the time      *)
+(* module.                                                                 *)
+(***************************************************************************)
+
 Termination == time!Termination
 
 =============================================================================
 \* Modification History
-\* Last modified Tue Nov 01 21:11:59 IRST 2022 by Arvin
+\* Last modified Wed Nov 02 15:51:35 IRST 2022 by Arvin
 \* Created Thu Oct 27 00:16:46 IRST 2022 by Arvin
