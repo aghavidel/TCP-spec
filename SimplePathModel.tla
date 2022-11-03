@@ -154,7 +154,9 @@ RateLimited == [] (inFlight <= t * C \/ ticked = 0)
 
 Max(a, b) == IF a > b THEN a ELSE b
 
-newPacketsAllowed(timePassed, existingPackets) == Max(timePassed*MAX_ARRIVAL - existingPackets - 1, 0)
+newPacketsAllowed(timePassed, existingPackets) == Max(
+    timePassed * MAX_ARRIVAL - existingPackets - 1, 0
+)
 
 getRandomArrival(timePassed, existingPackets) == 
     RandomElement(0..newPacketsAllowed(timePassed, existingPackets))
@@ -189,5 +191,5 @@ Termination == time!Termination
 
 =============================================================================
 \* Modification History
-\* Last modified Wed Nov 02 15:51:35 IRST 2022 by Arvin
+\* Last modified Wed Nov 02 15:57:14 IRST 2022 by Arvin
 \* Created Thu Oct 27 00:16:46 IRST 2022 by Arvin
