@@ -19,7 +19,8 @@ EXTENDS TLC, Sequences, Integers
 (* ssthresh       : Slow-Start threshold                                   *)
 (***************************************************************************)
 
-CONSTANT C, MAX_T, MAX_ARRIVAL, DROP_ACK, SSTHRESH_START, MAX_WINDOW
+CONSTANT C, MAX_T, MAX_ARRIVAL, DROP_ACK, 
+         SSTHRESH_START, MAX_WINDOW
 VARIABLES t, ticked, 
           nAck, inFlight, timeout, 
           added, arrivals, buffered, cwnd, ssthresh
@@ -27,7 +28,8 @@ VARIABLES t, ticked,
 timeVars == <<t, ticked>>
 pathVars == <<nAck, inFlight, timeout>>
 tcpVars == <<arrivals, buffered, cwnd, ssthresh, added>>
-vars == <<t, ticked, nAck, inFlight, timeout, arrivals, added, buffered, cwnd, ssthresh>>
+vars == <<t, ticked, nAck, inFlight, timeout, arrivals, added, buffered, 
+        cwnd, ssthresh>>
 
 time == INSTANCE Time WITH t <- t, ticked <- ticked, MAX_T <- MAX_T
 
@@ -45,8 +47,10 @@ time == INSTANCE Time WITH t <- t, ticked <- ticked, MAX_T <- MAX_T
 (*     4) Variables <<nAck, inFlight, timeout>> at the very least.         *)
 (***************************************************************************)
 
-path == INSTANCE SimplePathModel WITH nAck <- nAck, inFlight <- inFlight, timeout <- timeout,
-                                      C <- C, MAX_ARRIVAL <- MAX_ARRIVAL, DROP_ACK <- DROP_ACK 
+path == INSTANCE SimplePathModel WITH nAck <- nAck, inFlight <- inFlight, 
+                                      timeout <- timeout, C <- C, 
+                                      MAX_ARRIVAL <- MAX_ARRIVAL, 
+                                      DROP_ACK <- DROP_ACK 
         
 ASSUME /\ SSTHRESH_START > 1
        /\ MAX_WINDOW > SSTHRESH_START
@@ -123,7 +127,8 @@ IncreaseWindow == /\ EnableIncreaseWindow
                              /\ nAck' = nAck - 1
                         ELSE /\ nAck' = nAck - cwnd
                              /\ cwnd' = cwnd + 1
-                  /\ UNCHANGED <<ssthresh, timeout, inFlight, added, arrivals, buffered, t, ticked>>
+                  /\ UNCHANGED <<ssthresh, timeout, inFlight, added, 
+                               arrivals, buffered, t, ticked>>
                   
 (***************************************************************************)
 (* EnableDecreaseWindow:                                                   *)
@@ -151,7 +156,8 @@ DecreaseWindow == /\ EnableDecreaseWindow
                         ELSE /\ cwnd' = cwnd \div 2
                   /\ timeout' = 0
                   /\ nAck' = 0
-                  /\ UNCHANGED <<inFlight, added, arrivals, buffered, t, ticked>>
+                  /\ UNCHANGED <<inFlight, added, arrivals, buffered, t, 
+                               ticked>>
                                             
 Max(a, b) == IF a > b THEN a ELSE b
 
@@ -185,8 +191,8 @@ PacketAcceptIsEnabled == /\ ticked = 0
 
 AcceptPackets == /\ PacketAcceptIsEnabled
                  /\ added' = getRandomArrival(t, arrivals)
-                 /\ UNCHANGED <<t, ticked, nAck, inFlight, timeout, cwnd, ssthresh, 
-                    arrivals, buffered>>
+                 /\ UNCHANGED <<t, ticked, nAck, inFlight, timeout, cwnd, 
+                              ssthresh, arrivals, buffered>>
                     
 (***************************************************************************)
 (* PacketArrivalIsEnabled:                                                 *)
@@ -207,7 +213,8 @@ PacketArrival == /\ PacketArrivalIsEnabled
                  /\ arrivals' = arrivals + added
                  /\ buffered' = buffered + added
                  /\ added' = 0
-                 /\ UNCHANGED <<t, ticked, nAck, inFlight, timeout, cwnd, ssthresh>>
+                 /\ UNCHANGED <<t, ticked, nAck, inFlight, timeout, cwnd, 
+                              ssthresh>>
                  
 (***************************************************************************)
 (* PacketSendIsEnabled:                                                    *)
@@ -232,10 +239,11 @@ PacketSendIsEnabled == /\ ticked = 0
 SendNewPackets == /\ PacketSendIsEnabled
                   /\ IF cwnd - inFlight > buffered
                         THEN /\ inFlight' = inFlight + buffered
-                             /\ buffered = 0
+                             /\ buffered' = 0
                         ELSE /\ buffered' = buffered - (cwnd - inFlight)  
                              /\ inFlight' = cwnd 
-                  /\ UNCHANGED <<t, ticked, nAck, timeout, cwnd, added, ssthresh, arrivals>>
+                  /\ UNCHANGED <<t, ticked, nAck, timeout, cwnd, added, 
+                               ssthresh, arrivals>>
 
 Next == \/ IncreaseWindow
         \/ DecreaseWindow
@@ -250,5 +258,5 @@ Fairness == /\ path!Fairness
 Spec == Init /\ [][Next]_vars /\ Fairness                       
 =============================================================================
 \* Modification History
-\* Last modified Thu Nov 03 03:35:21 IRST 2022 by Arvin
+\* Last modified Thu Nov 03 18:58:18 IRST 2022 by Arvin
 \* Created Mon Oct 31 01:51:50 IRST 2022 by Arvin
